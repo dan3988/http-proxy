@@ -1,9 +1,14 @@
 {
-	"name": "ts",
+	"name": "http-proxy",
 	"version": "1.0.0",
 	"description": "",
 	"main": "./lib/main.js",
 	"type": "module",
+	"bin": "./bin/cli.js",
+	"files": [
+		"bin",
+		"lib"
+	],
 	"scripts": {
 		"build": "rollup -c",
 		"watch": "rollup -c -w"
@@ -12,7 +17,7 @@
 		"type": "git",
 		"url": "git+https://github.com/dan3988/rollup-ts.git"
 	},
-	"author": "",
+	"author": "dan3988",
 	"license": "ISC",
 	"bugs": {
 		"url": "https://github.com/dan3988/rollup-ts/issues"
