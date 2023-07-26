@@ -23,3 +23,7 @@ jobs:
         with:
           name: package
           path: '*.tgz'
+      - name: Publish
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM }}
