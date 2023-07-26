@@ -1,6 +1,6 @@
 {
-	"name": "http-proxy",
-	"version": "1.0.0",
+	"name": "@daniel.pickett/http-proxy",
+	"version": "0.1.0",
 	"description": "",
 	"main": "./lib/main.js",
 	"type": "module",
