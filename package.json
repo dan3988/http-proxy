@@ -15,14 +15,14 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/dan3988/rollup-ts.git"
+		"url": "git+https://github.com/dan3988/http-proxy"
 	},
 	"author": "dan3988",
 	"license": "ISC",
 	"bugs": {
-		"url": "https://github.com/dan3988/rollup-ts/issues"
+		"url": "https://github.com/dan3988/http-proxy/issues"
 	},
-	"homepage": "https://github.com/dan3988/rollup-ts#readme",
+	"homepage": "https://github.com/dan3988/http-proxy#readme",
 	"devDependencies": {
 		"@rollup/plugin-commonjs": "^25.0.3",
 		"@rollup/plugin-node-resolve": "^15.1.0",
