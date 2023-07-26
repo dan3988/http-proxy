@@ -3,6 +3,7 @@ import * as http from "node:http";
 import * as https  from "node:https";
 import * as util from "./util.js";
 import Task, { TaskComplete } from "./task.js";
+import stream from "./stream-helper.js";
 
 const port = 8081;
 const server = http.createServer();
@@ -91,10 +92,12 @@ function startTask(text: string) {
 	return task;
 }
 
-function handleRequest(req: http.IncomingMessage, res: http.ServerResponse) {
+async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse) {
 	const { url, headers, method = "GET" } = req;
 	if (headers["host"])
 		headers["host"] = targetUrl.host;
+
+	let closedHere = false;
 
 	const summary = `${method} ${url}`;
 	const task = startTask(summary);
@@ -104,32 +107,23 @@ function handleRequest(req: http.IncomingMessage, res: http.ServerResponse) {
 		headers
 	});
 
-	res.on("close", () => task.abort());
+	res.on("close", () => closedHere || task.abort());
 
-	outgoing.on("error", (err) => {
-		const txt = `${err.name}: ${err.message}`;
-		task.error(txt);
-		res.writeHead(500, { "content-type": "text/plain" });
-		res.write(txt);
-		res.end();
-	});
-	
-	outgoing.on("response", (incoming) => {
-		const { headers, statusCode = -1, statusMessage } = incoming;
-		const color = getColor(statusCode);
-
+	try {
+		await stream.pipe(req, outgoing, true, signal);
+		const response = await stream.getResponse(outgoing, signal);
+		const { headers, statusCode = -1, statusMessage } = response;
 		task.update(`${summary} ${statusCode} - writing response`);
-
 		res.writeHead(statusCode, statusMessage, headers);
-
-		incoming.pipe(res, { end: false });
-		incoming.on("end", () => {
-			res.end();
-			task.complete(color, `${summary} ${statusCode}`);
-		})
-	});
-
-	req.pipe(outgoing, endopt);
+		const color = getColor(statusCode);
+		await stream.pipe(response, res, false, signal);
+		task.complete(color, `${summary} ${statusCode}`);
+	} catch (e) {
+		task.error(e);
+	} finally {
+		closedHere = true;
+		res.end();
+	}
 }
 
 server.on("listening", () => console.log("listening on %s", chalk.yellow(port)));
