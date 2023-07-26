@@ -133,6 +133,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 	let closedHere = false;
 
 	const task = startTask(`${method} ${url}`);
+	const signal =  task.abortSignal;
 	const outgoing = driver.request(targetUrl, {
 		path: url,
 		method,
