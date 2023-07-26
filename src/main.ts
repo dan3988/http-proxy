@@ -38,6 +38,11 @@ const targetUrl = (() => {
 	}
 })();
 
+if (targetUrl.hostname === "127.0.0.1" && targetUrl.port == String(port)) {
+	console.log("%s", chalk.red("Target url is the same as this server"));
+	process.exit(-1);
+}
+
 const driver = targetUrl.protocol === "http:" ? http : https;
 const statusColors: Record<string, util.ChalkColor> = {
 	"1": "blue",
