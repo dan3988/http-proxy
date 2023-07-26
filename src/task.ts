@@ -1,4 +1,4 @@
-import type { ChalkColor } from "./util.js";
+import type { ChalkColor, StringLike } from "./util.js";
 import chalk from "chalk";
 
 export interface TaskFactory {
@@ -36,17 +36,18 @@ export interface TaskConstructor {
 	new(text: string): Task;
 }
 
-type ColoredArgs = readonly [color: ChalkColor, text: string];
-type ColorableArgs = readonly [text: string] | ColoredArgs;
+type ColoredArgs = readonly [color: ChalkColor, text: StringLike];
+type ColorableArgs = readonly [text: StringLike] | ColoredArgs;
 
 function unwrapArgs(fallback: ChalkColor, args: ColorableArgs): ColoredArgs {
 	return args.length === 2 ? args : [fallback, args[0]];
 }
 
 class TaskImpl implements TaskBase {
+	readonly #prefix: string;
+	readonly #controller: AbortController;
+	readonly #initiated: number;
 	#text: string;
-	#controller: AbortController;
-	#initiated: number;
 	#initiatedText: string;
 	#completed: null | number;
 
@@ -74,18 +75,24 @@ class TaskImpl implements TaskBase {
 		return this.#controller.signal;
 	}
 
-	constructor(text: string) {
+	constructor(prefix: string) {
 		const now = Date.now();
-		this.#text = chalk.blue(text);
+		prefix =  chalk.blue(prefix);
+		this.#prefix = prefix;
+		this.#text = prefix;
 		this.#controller = new AbortController();
 		this.#initiated = now;
 		this.#initiatedText = new Date(now).toISOString().substring(11, 23);
 		this.#completed = null;
 	}
 
+	#setText(color: ChalkColor, text: StringLike) {
+		this.#text = this.#prefix + " - " + chalk[color](text);
+	}
+
 	abort() {
 		if (this.#completed == null) {
-			this.#text = chalk.redBright("Request aborted");
+			this.#setText("redBright", "Request aborted");
 			this.#completed = Date.now();
 			this.#controller.abort();
 		}
@@ -96,7 +103,7 @@ class TaskImpl implements TaskBase {
 			return;
 			
 		const [color, text] = unwrapArgs("green", args);
-		this.#text = chalk[color](text);
+		this.#setText(color, text);
 	}
 
 	complete(...args: ColorableArgs) {
@@ -104,7 +111,7 @@ class TaskImpl implements TaskBase {
 			return;
 
 		const [color, text] = unwrapArgs("green", args);
-		this.#text = chalk[color](text);
+		this.#setText(color, text);
 		this.#completed = Date.now();
 		this.#controller.abort();
 	}
@@ -113,7 +120,7 @@ class TaskImpl implements TaskBase {
 		if (this.#completed != null)
 			return;
 
-		this.#text = chalk.red(e);
+		this.#setText("red", e);
 		this.#completed = Date.now();
 		this.#controller.abort();
 	}

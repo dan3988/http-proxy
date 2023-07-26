@@ -132,8 +132,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 
 	let closedHere = false;
 
-	const summary = `${method} ${url}`;
-	const task = startTask(summary);
+	const task = startTask(`${method} ${url}`);
 	const outgoing = driver.request(targetUrl, {
 		path: url,
 		method,
@@ -146,11 +145,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 		await stream.pipe(req, outgoing, true, signal);
 		const response = await stream.getResponse(outgoing, signal);
 		const { headers, statusCode = -1, statusMessage } = response;
-		task.update(`${summary} ${statusCode} - writing response`);
+		task.update(`${statusCode} - writing response`);
 		res.writeHead(statusCode, statusMessage, headers);
 		const color = getColor(statusCode);
 		await stream.pipe(response, res, false, signal);
-		task.complete(color, `${summary} ${statusCode}`);
+		task.complete(color, statusCode);
 	} catch (e) {
 		task.error(e);
 	} finally {

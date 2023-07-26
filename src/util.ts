@@ -2,7 +2,8 @@ type ChalkColorBase = "red" | "green" | "blue" | "yellow" | "magenta" | "white" 
 type ChalkColorAll = ChalkColorBase | `${ChalkColorBase}Bright`;
 type Prefix<Prefix extends string, Name extends string> = `${Prefix}${Capitalize<Name>}`;
 
-export type ChalkColor = "gray" | ChalkColorAll | Prefix<"bg", ChalkColorAll>
+export type ChalkColor = "gray" | ChalkColorAll | Prefix<"bg", ChalkColorAll>;
+export type StringLike = string | number | boolean | { [Symbol.toPrimitive](hint: "string"): string; }
 
 export function delay(ms: number, signal?: AbortSignal): Promise<boolean> {
 	if ((ms = Number(ms)) === 0)
