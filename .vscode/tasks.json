@@ -1,0 +1,39 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "watch",
+			"type": "npm",
+			"script": "watch",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"isBackground": true,
+			"problemMatcher": {
+				"owner": "typescript",
+				"source": "ts",
+				"applyTo": "allDocuments",
+				"fileLocation": "relative",
+				"pattern": {
+					"regexp": "^TS(?<errorCode>\\d+)\\s(?<file>.*?):(?<line>\\d+):(?<column>\\d+):\\s(?<message>.+)$",
+					"code": 1,
+					"file": 2,
+					"line": 3,
+					"column": 4,
+					"message": 5
+				},
+				"severity": "error",
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": {
+						"regexp": "^rollup v\\d+\\.\\d+\\.\\d+$"
+					},
+					"endsPattern": {
+						"regexp": "^\\[[:-\\s\\d]+\\] waiting for changes\\.\\.\\.$"
+					}
+				}
+			}
+		},
+	]
+}

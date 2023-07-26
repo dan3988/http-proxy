@@ -1,0 +1,33 @@
+{
+	"name": "ts",
+	"version": "1.0.0",
+	"description": "",
+	"main": "./lib/main.js",
+	"type": "module",
+	"scripts": {
+		"build": "rollup -c",
+		"watch": "rollup -c -w"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/dan3988/rollup-ts.git"
+	},
+	"author": "",
+	"license": "ISC",
+	"bugs": {
+		"url": "https://github.com/dan3988/rollup-ts/issues"
+	},
+	"homepage": "https://github.com/dan3988/rollup-ts#readme",
+	"devDependencies": {
+		"@rollup/plugin-commonjs": "^25.0.3",
+		"@rollup/plugin-node-resolve": "^15.1.0",
+		"@rollup/plugin-terser": "^0.4.3",
+		"@rollup/plugin-typescript": "^11.1.2",
+		"@types/node": "^18.7.23",
+		"rollup": "^3.26.3",
+		"tslib": "^2.6.1",
+		"typescript": "^4.8.3"
+	},
+	"dependencies": {
+	}
+}
