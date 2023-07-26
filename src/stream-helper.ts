@@ -18,11 +18,12 @@ export namespace stream {
 		input.pause();
 	
 		return new Promise<void>((resolve, reject) => {
-			signal?.addEventListener("abort", () => {
-				reject(new Error("Request aborted"));
-				input.destroy();
-			});
-	
+			if (signal != null)
+				[resolve, reject] = abortable(signal, resolve, reject, () => {
+					reject(new Error("Request aborted"));
+					input.destroy();
+				});
+
 			input.on("data", c => output.write(c));
 			input.on("error", reject);
 			input.on("end", end ? () => output.end(resolve) : resolve);
@@ -43,16 +44,31 @@ export namespace stream {
 		
 	export function getResponse(req: http.ClientRequest, signal?: AbortSignal) {
 		return new Promise<http.IncomingMessage>((resolve, reject) => {
-			signal?.addEventListener("abort", () => {
-				reject(new Error("Request aborted"));
-				req.destroy();
-			});
+			if (signal != null)
+				[resolve, reject] = abortable(signal, resolve, reject, () => {
+					reject(new Error("Request aborted"));
+					req.destroy();
+				});
 
 			req.on("error", reject);
 			req.on("response", resolve);
 			req.end();
 		});
 	}
+}
+
+function abortable<T>(signal: AbortSignal, resolve: Resolver<T>, reject: Rejector, onAbort: Action, ): ResolveReject<T> {
+	signal.addEventListener("abort", onAbort);
+
+	return [
+		resolve = finish.bind(signal, onAbort, resolve as any),
+		reject = finish.bind(signal, onAbort, reject)
+	]
+}
+
+function finish<T>(this: AbortSignal, handler: () => any, fn: (arg: T) => any, arg: T) {
+	this.removeEventListener("abort", handler);
+	fn(arg);
 }
 
 export default stream;
