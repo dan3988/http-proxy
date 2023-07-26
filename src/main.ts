@@ -21,7 +21,7 @@ const parser = yargs(argv)
 		desc: "The port to start a server on.",
 		alias: "p",
 		type: "number",
-		default: 80
+		default: 8080
 	})
 
 const { port, target } = parser.parseSync();
