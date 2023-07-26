@@ -6,7 +6,8 @@
 			"program": "${workspaceFolder}/lib/main.js",
 			"request": "launch",
 			"type": "node",
-			"preLaunchTask": "watch"
+			"preLaunchTask": "watch",
+			"console": "integratedTerminal"
 		}
 	]
 }

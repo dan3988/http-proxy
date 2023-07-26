@@ -25,7 +25,8 @@ export default defineConfig({
 		typescript(),
 		commonjs(),
 		resolve({
-			browser: false
+			browser: false,
+			resolveOnly: () => false
 		}),
 		production && terser()
 	]
