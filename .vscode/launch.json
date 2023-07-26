@@ -6,6 +6,7 @@
 			"program": "${workspaceFolder}/lib/main.js",
 			"request": "launch",
 			"type": "node",
+			"args": [ "-t", "http://localhost:8080", "-p", "8081" ],
 			"preLaunchTask": "watch",
 			"console": "integratedTerminal"
 		}

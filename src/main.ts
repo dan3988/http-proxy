@@ -4,13 +4,41 @@ import * as https  from "node:https";
 import * as util from "./util.js";
 import Task, { TaskComplete } from "./task.js";
 import stream from "./stream-helper.js";
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
 
-const port = 8081;
+const argv = hideBin(process.argv);
+const parser = yargs(argv)
+	.wrap(100)
+	.alias("?", "help")
+	.option("target", {
+		desc: "The URL target of the proxy, or a number for a localhost port.",
+		alias: "t",
+		type: "string",
+		demandOption: true
+	})
+	.option("port", {
+		desc: "The port to start a server on.",
+		alias: "p",
+		type: "number",
+		default: 80
+	})
+
+const { port, target } = parser.parseSync();
 const server = http.createServer();
-const targetUrl = new URL("http://127.0.0.1:8080");
-const driver = targetUrl.protocol === "http:" ? http : https;
-const endopt = { end: true };
+const targetUrl = (() => {
+	if (isNaN(+target)) {
+		const url = new URL(target);
+		if (url.hostname === "localhost")
+			url.hostname = "127.0.0.1";
 
+		return url;
+	} else {
+		return new URL("http://127.0.0.1:" + target);
+	}
+})();
+
+const driver = targetUrl.protocol === "http:" ? http : https;
 const statusColors: Record<string, util.ChalkColor> = {
 	"1": "blue",
 	"2": "green",
