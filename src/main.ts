@@ -1,9 +1,10 @@
-import chalk from "chalk";
 import * as http from "node:http";
 import * as https  from "node:https";
 import * as util from "./util.js";
+import * as ws from "ws";
 import Task, { TaskComplete } from "./task.js";
 import stream from "./stream-helper.js";
+import chalk from "chalk";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
@@ -26,6 +27,7 @@ const parser = yargs(argv)
 
 const { port, target } = parser.parseSync();
 const server = http.createServer();
+const wss = new ws.WebSocketServer({ server });
 const targetUrl = (() => {
 	if (isNaN(+target)) {
 		const url = new URL(target);
@@ -129,11 +131,17 @@ function startTask(text: string) {
 	return task;
 }
 
-async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse) {
-	const { url, headers, method = "GET" } = req;
+function fixHeaders(headers: http.IncomingHttpHeaders) {
 	if (headers["host"])
 		headers["host"] = targetUrl.host;
 
+	if (headers["origin"])
+		headers["origin"] = targetUrl.host;
+}
+
+async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse) {
+	const { url, headers, method = "GET" } = req;
+	fixHeaders(headers);
 	let closedHere = false;
 
 	const task = startTask(`${method} ${url}`);
@@ -162,6 +170,70 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 		res.end();
 	}
 }
+
+function onSocketOpened(socket: ws.WebSocket, req: http.IncomingMessage) {
+	delete req.headers["sec-websocket-key"];
+	fixHeaders(req.headers);
+	const task = startTask(`ws: ${req.url}`);
+	task.update("proxying socket");
+	const url = new URL(req.url!, targetUrl);
+	url.protocol = url.protocol.replace("http", "ws");
+	const queue: { data?: ws.RawData, binary: boolean }[] = [];
+	const target = new ws.WebSocket(url, {
+		headers: req.headers
+	});
+
+	function onAbort() {
+		target.close();
+		task.complete("gray", "socket closed");
+	}
+
+	signal.addEventListener("abort", onAbort);
+
+	socket.on("close", () => {
+		onAbort();
+		signal.removeEventListener("abort", onAbort);
+	});
+
+	socket.on("message", (data, binary) => {
+		if (target.readyState === ws.WebSocket.OPEN) {
+			target.send(data, { binary });
+		} else {
+			queue.push({ data, binary });
+		}
+	});
+
+	target.on("error", e => {
+		task.error(e);
+		socket.close(1011, String(e));
+	});
+
+	target.on("message", (data, binary) => {
+		socket.send(data, { binary })
+	});
+
+	target.on("open", () => {
+		task.update("green", "socket open");
+		let message;
+		while ((message = queue.shift())) {
+			const { data } = message;
+			delete message.data;
+			socket.send(data!, message);
+		}
+	});
+
+	target.on("close", (code, reason) => {
+		task.abort();
+		if (code === 1005) {
+			socket.close();
+		} else {
+			socket.close(code, reason);
+		}
+	})
+}
+
+wss.on("connection", onSocketOpened);
+
 server.on("listening", () => console.log("listening on %s", chalk.yellow(port)));
 server.on("request", handleRequest);
 server.listen(port, () => render());
