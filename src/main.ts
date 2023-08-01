@@ -56,7 +56,11 @@ const loadingAnim = util.makeLoaing(" ", "=", 7);
 const tasks: Task[] = [];
 const signal = (() => {
 	const ac = new AbortController();
-	const cancel = AbortController.prototype.abort.bind(ac);
+	function cancel() {
+		ac.abort();
+		server.close();
+	}
+
 	process.on("SIGABRT", cancel);
 	process.on("SIGBREAK", cancel);
 	process.on("SIGINT", cancel);
@@ -158,7 +162,6 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 		res.end();
 	}
 }
-
 server.on("listening", () => console.log("listening on %s", chalk.yellow(port)));
 server.on("request", handleRequest);
 server.listen(port, () => render());
