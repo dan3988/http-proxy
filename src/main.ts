@@ -30,17 +30,13 @@ const server = http.createServer();
 const wss = new ws.WebSocketServer({ server });
 const targetUrl = (() => {
 	if (isNaN(+target)) {
-		const url = new URL(target);
-		if (url.hostname === "localhost")
-			url.hostname = "127.0.0.1";
-
-		return url;
+		return new URL(target);
 	} else {
-		return new URL("http://127.0.0.1:" + target);
+		return new URL("http://localhost:" + target);
 	}
 })();
 
-if (targetUrl.hostname === "127.0.0.1" && targetUrl.port == String(port)) {
+if ((targetUrl.hostname === "127.0.0.1" || targetUrl.hostname === "localhost") && targetUrl.port == String(port)) {
 	console.log("%s", chalk.red("Target url is the same as this server"));
 	process.exit(-1);
 }
