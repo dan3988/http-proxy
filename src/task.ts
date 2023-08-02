@@ -33,7 +33,8 @@ export type Task = TaskIncomplete | TaskComplete;
 
 export interface TaskConstructor {
 	readonly prototype: Task;
-	new(text: string): Task;
+	new(prefix: string): Task;
+	new(color: ChalkColor, prefix: string): Task;
 }
 
 type ColoredArgs = readonly [color: ChalkColor, text: StringLike];
@@ -75,11 +76,12 @@ class TaskImpl implements TaskBase {
 		return this.#controller.signal;
 	}
 
-	constructor(prefix: string) {
+	constructor(...args: ColorableArgs) {
 		const now = Date.now();
-		prefix =  chalk.blue(prefix);
-		this.#prefix = prefix;
-		this.#text = prefix;
+		const [color, prefix] = unwrapArgs("blue", args);
+		const text =  chalk[color](prefix);
+		this.#prefix = text;
+		this.#text = text;
 		this.#controller = new AbortController();
 		this.#initiated = now;
 		this.#initiatedText = new Date(now).toISOString().substring(11, 23);

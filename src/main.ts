@@ -47,11 +47,11 @@ if (targetUrl.hostname === "127.0.0.1" && targetUrl.port == String(port)) {
 
 const driver = targetUrl.protocol === "http:" ? http : https;
 const statusColors: Record<string, util.ChalkColor> = {
-	"1": "blue",
-	"2": "green",
-	"3": "yellow",
-	"4": "magenta",
-	"5": "red"
+	"1": "blueBright",
+	"2": "greenBright",
+	"3": "greenBright",
+	"4": "redBright",
+	"5": "redBright"
 }
 
 const loadingAnim = util.makeLoaing(" ", "=", 7);
@@ -125,7 +125,7 @@ async function render() {
 }
 
 function startTask(text: string) {
-	const task = new Task(text);
+	const task = new Task("blueBright", text);
 	tasks.push(task);
 	renderController.abort();
 	return task;
