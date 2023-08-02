@@ -11,7 +11,6 @@ export interface TaskBase {
 	readonly text: string;
 	readonly duration: null | number;
 	readonly isCompleted: boolean;
-	readonly abortSignal: AbortSignal;
 
 	abort(): void;
 	update(...args: ColorableArgs): void;
@@ -46,7 +45,6 @@ function unwrapArgs(fallback: ChalkColor, args: ColorableArgs): ColoredArgs {
 
 class TaskImpl implements TaskBase {
 	readonly #prefix: string;
-	readonly #controller: AbortController;
 	readonly #initiated: number;
 	#text: string;
 	#initiatedText: string;
@@ -72,17 +70,12 @@ class TaskImpl implements TaskBase {
 		return this.#completed != null;
 	}
 
-	get abortSignal() {
-		return this.#controller.signal;
-	}
-
 	constructor(...args: ColorableArgs) {
 		const now = Date.now();
 		const [color, prefix] = unwrapArgs("blue", args);
 		const text =  chalk[color](prefix);
 		this.#prefix = text;
 		this.#text = text;
-		this.#controller = new AbortController();
 		this.#initiated = now;
 		this.#initiatedText = new Date(now).toISOString().substring(11, 23);
 		this.#completed = null;
@@ -96,7 +89,6 @@ class TaskImpl implements TaskBase {
 		if (this.#completed == null) {
 			this.#setText("redBright", "Request aborted");
 			this.#completed = Date.now();
-			this.#controller.abort();
 		}
 	}
 
@@ -115,7 +107,6 @@ class TaskImpl implements TaskBase {
 		const [color, text] = unwrapArgs("green", args);
 		this.#setText(color, text);
 		this.#completed = Date.now();
-		this.#controller.abort();
 	}
 
 	error(e: any) {
@@ -124,7 +115,6 @@ class TaskImpl implements TaskBase {
 
 		this.#setText("red", e);
 		this.#completed = Date.now();
-		this.#controller.abort();
 	}
 }
 

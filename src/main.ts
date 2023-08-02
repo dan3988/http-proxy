@@ -145,14 +145,20 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 	let closedHere = false;
 
 	const task = startTask(`${method} ${url}`);
-	const signal =  task.abortSignal;
+	const ac =  new AbortController();
+	const { signal } = ac;
 	const outgoing = driver.request(targetUrl, {
 		path: url,
 		method,
 		headers
 	});
 
-	res.on("close", () => closedHere || task.abort());
+	res.on("close", () => {
+		if (!closedHere) {
+			ac.abort();
+			task.abort();
+		}
+	});
 
 	try {
 		await stream.pipe(req, outgoing, true, signal);
