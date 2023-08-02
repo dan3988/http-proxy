@@ -27,11 +27,77 @@ const openCodes: Record<ConsoleColor, [fg: string, bg: string]> = {
 };
 
 export interface ConsoleWriter {
+	/**
+	 * For writing escape sequences that will not be rendered by the console
+	 */
 	writeEsc(value: string): void;
+	/**
+	 * For writing normal text to the console
+	 */
 	write(value: string): void;
 }
 
-export class ConsoleString {
+export interface ConsoleStringInit {
+	value: StringLike;
+	fg?: ConsoleColor;
+	bg?: ConsoleColor;
+}
+
+export interface ConsoleString {
+	writeTo(output: ConsoleWriter): void;
+	toString(): string;
+}
+
+interface ConsoleStringConstructorBase {
+	readonly EMPTY: ConsoleString;
+	readonly SPACE: ConsoleString;
+	readonly prototype: ConsoleString;
+	new(text: StringLike, fg?: ConsoleColor, bg?: ConsoleColor): ConsoleString;
+}
+
+interface ConsoleStringFunction {
+	(template: TemplateStringsArray, ...args: ConsoleStringInit[]): string;
+	(text: StringLike, fg?: ConsoleColor, bg?: ConsoleColor): string;
+}
+
+interface ConsoleStringConstructor extends ConsoleStringConstructorBase, ConsoleStringFunction {
+}
+
+function templateString(template: TemplateStringsArray, args: ConsoleStringInit[]) {
+	const first = template[0];
+	const builder: StringLike[] = [first];
+
+	for (let i = 0; i < args.length; ) {
+		const { value: text, bg, fg } = args[i];
+		const string = template[++i]
+		const [open, close] = getOpenClose(fg, bg);
+		builder.push(open, text, close, string);
+	}
+
+	return builder.join("");
+}
+
+function getOpenClose(fg: undefined | ConsoleColor, bg: undefined | ConsoleColor) {
+	let open = "";
+	let close = "";
+	if (fg) {
+		const p = openCodes[fg];
+		open += p[0];
+		close += closeFg;
+	}
+
+	if (bg) {
+		const p = openCodes[bg];
+		open += p[1];
+		close += closeBg;
+	}
+
+	return [open, close] as const;
+}
+
+type IConsoleString = ConsoleString;
+
+const constructor = class ConsoleString implements IConsoleString {
 	static readonly EMPTY = new this("");
 	static readonly SPACE = new this(" ");
 
@@ -40,19 +106,7 @@ export class ConsoleString {
 	readonly #close: string;
 
 	constructor(text: StringLike, fg?: ConsoleColor, bg?: ConsoleColor) {
-		let open = "";
-		let close = "";
-		if (fg) {
-			const p = openCodes[fg];
-			open += p[0];
-			close += closeFg;
-		}
-		if (bg) {
-			const p = openCodes[bg];
-			open += p[1];
-			close += closeBg;
-		}
-
+		const [open, close] = getOpenClose(fg, bg);
 		this.#text = String(text);
 		this.#open = open;
 		this.#close = close;
@@ -63,6 +117,23 @@ export class ConsoleString {
 		output.write(this.#text);
 		output.writeEsc(this.#close);
 	}
-}
+
+	toString() {
+		return this.#open + this.#text + this.#close;
+	}
+} satisfies ConsoleStringConstructorBase;
+
+export var ConsoleString: ConsoleStringConstructor = <any>new Proxy(constructor, {
+	apply(_target, _thisArg, argArray) {
+		const first = argArray.shift();
+		if (Array.isArray(first)) {
+			return templateString.call(undefined, first as any, argArray);
+		} else {
+			const [fg, bg] = argArray as [ConsoleColor?, ConsoleColor?];
+			const [open, close] = getOpenClose(fg, bg);
+			return open + first + close;
+		}
+	}
+})
 
 export default ConsoleString;

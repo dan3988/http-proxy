@@ -4,10 +4,9 @@ import * as util from "./util.js";
 import * as ws from "ws";
 import Task, { TaskComplete } from "./task.js";
 import stream from "./stream-helper.js";
-import chalk from "chalk";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
-import type { ConsoleColor, ConsoleWriter } from "./console-string.js";
+import ConsoleString, { ConsoleColor, ConsoleWriter } from "./console-string.js";
 import type { WriteStream } from "node:tty";
 
 const argv = hideBin(process.argv);
@@ -39,7 +38,7 @@ const targetUrl = (() => {
 })();
 
 if ((targetUrl.hostname === "127.0.0.1" || targetUrl.hostname === "localhost") && targetUrl.port == String(port)) {
-	console.log("%s", chalk.red("Target url is the same as this server"));
+	console.log("%s", ConsoleString("Target url is the same as this server", "red"))
 	process.exit(-1);
 }
 
@@ -121,7 +120,7 @@ async function render() {
 	const out = process.stdout;
 	out.cursorTo(0, 0);
 	out.clearScreenDown();
-	out.write(`listening on ${chalk.yellow(port)}\n`);
+	out.write(ConsoleString`listening on ${{ value: port, fg: "yellow" }}\n`);
 
 	let loadingIndex = 0;
 	let timeout = -1;
@@ -168,7 +167,7 @@ async function render() {
 		timeout = 100;
 	}
 
-	out.write(chalk.red("Server stopped\n"));
+	out.write(ConsoleString("Server stopped\n", "red"));
 }
 
 function startTask(text: string) {
@@ -287,6 +286,5 @@ function onSocketOpened(socket: ws.WebSocket, req: http.IncomingMessage) {
 
 wss.on("connection", onSocketOpened);
 
-server.on("listening", () => console.log("listening on %s", chalk.yellow(port)));
 server.on("request", handleRequest);
 server.listen(port, () => render());
