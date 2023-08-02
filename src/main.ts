@@ -7,6 +7,8 @@ import stream from "./stream-helper.js";
 import chalk from "chalk";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
+import type { ConsoleColor, ConsoleWriter } from "./console-string.js";
+import type { WriteStream } from "node:tty";
 
 const argv = hideBin(process.argv);
 const parser = yargs(argv)
@@ -42,7 +44,7 @@ if ((targetUrl.hostname === "127.0.0.1" || targetUrl.hostname === "localhost") &
 }
 
 const driver = targetUrl.protocol === "http:" ? http : https;
-const statusColors: Record<string, util.ChalkColor> = {
+const statusColors: Record<string, ConsoleColor> = {
 	"1": "blueBright",
 	"2": "greenBright",
 	"3": "greenBright",
@@ -70,6 +72,49 @@ let renderController = new AbortController();
 function getColor(statusCode: number) {
 	const key = Math.floor(statusCode / 100);
 	return statusColors[key] ?? String;
+}
+
+/**
+ * Writer that truncates text if it's longer than the width of the console 
+ */
+class ConsoleLineWriter implements ConsoleWriter {
+	readonly #out: WriteStream;
+	#done: boolean;
+	#len: number;
+
+	constructor(out: WriteStream) {
+		this.#out = out;
+		this.#len = 0;
+		this.#done = false;
+	}
+
+	writeEsc(value: string): void {
+		this.#out.write(value);
+	}
+
+	write(value: string): void {
+		if (this.#done)
+			return;
+
+		const out = this.#out;
+		const remaining = out.columns - this.#len - 3;
+		if (remaining >= value.length) {
+			out.write(value);
+			this.#len += value.length;
+		} else {
+			const txt = value.substring(0, remaining);
+			out.write(txt);
+			out.write("...");
+			this.#len += remaining;
+			this.#done = true;
+		}
+	}
+
+	next() {
+		this.#out.write("\n")
+		this.#done = false;
+		this.#len = 0;
+	}
 }
 
 async function render() {
@@ -101,8 +146,12 @@ async function render() {
 			}
 		}
 
-		for (const task of completed)
-			out.write(`[${task.initiatedText}] [${(task.duration / 1000).toFixed(3).padStart(6, " ")}s] ${task.text}\n`);
+		const writer = new ConsoleLineWriter(out);
+
+		for (const task of completed) {
+			task.write(writer);
+			writer.next();
+		}
 
 		if ((messageCount = tasks.length) === 0) {
 			loadingIndex = 0;
@@ -110,8 +159,10 @@ async function render() {
 			continue;
 		}
 
-		for (const task of tasks)
-			out.write(`[${task.initiatedText}] [${loadingAnim[loadingIndex]}] ${task.text}\n`);
+		for (const task of tasks) {
+			task.write(writer);
+			writer.next();
+		}
 		
 		loadingIndex = (loadingIndex + 1) % loadingAnim.length;
 		timeout = 100;
@@ -121,7 +172,7 @@ async function render() {
 }
 
 function startTask(text: string) {
-	const task = new Task("blueBright", text);
+	const task = new Task(loadingAnim, text, "blueBright");
 	tasks.push(task);
 	renderController.abort();
 	return task;
@@ -187,7 +238,7 @@ function onSocketOpened(socket: ws.WebSocket, req: http.IncomingMessage) {
 
 	function onAbort() {
 		target.close();
-		task.complete("gray", "socket closed");
+		task.complete("blackBright", "socket closed");
 	}
 
 	signal.addEventListener("abort", onAbort);

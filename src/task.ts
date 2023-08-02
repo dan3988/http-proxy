@@ -1,5 +1,5 @@
-import type { ChalkColor, StringLike } from "./util.js";
-import chalk from "chalk";
+import ConsoleString, { ConsoleColor, ConsoleWriter } from "./console-string.js";
+import type { StringLike } from "./util.js";
 
 export interface TaskFactory {
 	start(text: string): Task;
@@ -7,8 +7,6 @@ export interface TaskFactory {
 
 export interface TaskBase {
 	readonly initiated: number;
-	readonly initiatedText: string;
-	readonly text: string;
 	readonly duration: null | number;
 	readonly isCompleted: boolean;
 
@@ -16,6 +14,8 @@ export interface TaskBase {
 	update(...args: ColorableArgs): void;
 	complete(...args: ColorableArgs): void;
 	error(e: any): void;
+
+	write(writer: ConsoleWriter): void;
 }
 
 export interface TaskIncomplete extends TaskBase {
@@ -32,22 +32,22 @@ export type Task = TaskIncomplete | TaskComplete;
 
 export interface TaskConstructor {
 	readonly prototype: Task;
-	new(prefix: string): Task;
-	new(color: ChalkColor, prefix: string): Task;
+	new(anim: string[], prefix: string, color?: ConsoleColor): Task;
 }
 
-type ColoredArgs = readonly [color: ChalkColor, text: StringLike];
+type ColoredArgs = readonly [color: ConsoleColor, text: StringLike];
 type ColorableArgs = readonly [text: StringLike] | ColoredArgs;
 
-function unwrapArgs(fallback: ChalkColor, args: ColorableArgs): ColoredArgs {
+function unwrapArgs(fallback: ConsoleColor, args: ColorableArgs): ColoredArgs {
 	return args.length === 2 ? args : [fallback, args[0]];
 }
 
 class TaskImpl implements TaskBase {
-	readonly #prefix: string;
+	readonly #loading: string[];
+	#loadingIndex: number;
 	readonly #initiated: number;
-	#text: string;
-	#initiatedText: string;
+	readonly #initiatedText: string;
+	readonly #text: ConsoleString[];
 	#completed: null | number;
 
 	get initiated() {
@@ -58,10 +58,6 @@ class TaskImpl implements TaskBase {
 		return this.#initiatedText;
 	}
 
-	get text() {
-		return this.#text;
-	}
-
 	get duration() {
 		return this.#completed && (this.#completed - this.#initiated);
 	}
@@ -70,19 +66,19 @@ class TaskImpl implements TaskBase {
 		return this.#completed != null;
 	}
 
-	constructor(...args: ColorableArgs) {
+	constructor(loading: string[], prefix: string, color?: ConsoleColor) {
 		const now = Date.now();
-		const [color, prefix] = unwrapArgs("blue", args);
-		const text =  chalk[color](prefix);
-		this.#prefix = text;
-		this.#text = text;
+		const first =  new ConsoleString(prefix, color);
+		this.#loading = loading;
+		this.#loadingIndex = 0;
+		this.#text = [first];
 		this.#initiated = now;
 		this.#initiatedText = new Date(now).toISOString().substring(11, 23);
 		this.#completed = null;
 	}
 
-	#setText(color: ChalkColor, text: StringLike) {
-		this.#text = this.#prefix + " - " + chalk[color](text);
+	#setText(color: ConsoleColor, text: StringLike) {
+		this.#text[1] = new ConsoleString(text, color);
 	}
 
 	abort() {
@@ -115,6 +111,32 @@ class TaskImpl implements TaskBase {
 
 		this.#setText("red", e);
 		this.#completed = Date.now();
+	}
+
+	write(writer: ConsoleWriter): void {
+		writer.write("[");
+		writer.write(this.initiatedText);
+		writer.write("] [");
+
+		const text = this.#text;
+		const dur = this.duration;
+		if (dur == null) {
+			const anim = this.#loading;
+			const index = this.#loadingIndex;
+			this.#loadingIndex = (index + 1) % anim.length;
+			writer.write(anim[index]);
+		} else {
+			const txt = (dur / 1000).toFixed(3).padStart(6, " ");
+			writer.write(txt);
+			writer.write("s");
+		}
+
+		writer.write("]");
+
+		for (let i = 0; i < text.length; i++) {
+			writer.write(" ");
+			text[i].writeTo(writer);
+		}
 	}
 }
 
