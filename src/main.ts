@@ -25,8 +25,12 @@ const parser = yargs(argv)
 		type: "number",
 		default: 8080
 	})
+	.option("ip", {
+		desc: "Show the IP address of requests in the console.",
+		type: "boolean"
+	})
 
-const { port, target } = parser.parseSync();
+const { port, target, ip } = parser.parseSync();
 const server = http.createServer();
 const wss = new ws.WebSocketServer({ server });
 const targetUrl = isNaN(+target) ? new URL(target) : new URL("http://localhost:" + target);
@@ -194,6 +198,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 		headers
 	});
 
+	if (ip) {
+		const addr = req.socket.remoteAddress!;
+		task.addField({ value: addr, color: "magentaBright" });
+	}
+
 	task.addField({ value: `${method} ${url}`, color: "blueBright" });
 	let status = task.addField({ value: "processing request" });
 
@@ -240,6 +249,11 @@ function onSocketOpened(socket: ws.WebSocket, req: http.IncomingMessage) {
 	const target = new ws.WebSocket(url, {
 		headers: req.headers
 	});
+
+	if (ip) {
+		const addr = req.socket.remoteAddress!;
+		task.addField({ value: addr, color: "magentaBright" });
+	}
 
 	task.addField({ value: `WS ${req.url}`, color: "blueBright" });
 	let status = task.addField({ value: "processing request" });
