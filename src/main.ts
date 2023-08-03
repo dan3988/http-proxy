@@ -163,8 +163,10 @@ async function render() {
 	out.write(ConsoleString("Server stopped\n", "red"));
 }
 
-function startTask(text: string) {
-	const task = new Task(loadingAnim, text, "blueBright");
+function startTask() {
+	const task = new Task(loadingAnim);
+	task.addField({ field: "initiated", format: "[%s]" });
+	task.addField({ field: "progress", format: "[%s]" });
 	tasks.push(task);
 	renderController.abort();
 	return task;
@@ -183,7 +185,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 	fixHeaders(headers);
 	let closedHere = false;
 
-	const task = startTask(`${method} ${url}`);
+	const task = startTask();
 	const ac =  new AbortController();
 	const { signal } = ac;
 	const outgoing = driver.request(targetUrl, {
@@ -192,10 +194,22 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 		headers
 	});
 
+	task.addField({ value: `${method} ${url}`, color: "blueBright" });
+	let status = task.addField({ value: "processing request" });
+
+	function complete(value: util.StringLike, color?: ConsoleColor) {
+		update(value, color);
+		task.complete();
+	}
+
+	function update(value: util.StringLike, color?: ConsoleColor) {
+		status = status.replace({ value, color });
+	}
+
 	res.on("close", () => {
 		if (!closedHere) {
 			ac.abort();
-			task.abort();
+			complete("Request aborted by client", "blackBright");
 		}
 	});
 
@@ -203,13 +217,13 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 		await stream.pipe(req, outgoing, true, signal);
 		const response = await stream.getResponse(outgoing, signal);
 		const { headers, statusCode = -1, statusMessage } = response;
-		task.update(`${statusCode} - writing response`);
+		update(`${statusCode} - writing response`, "greenBright");
 		res.writeHead(statusCode, statusMessage, headers);
 		const color = getColor(statusCode);
 		await stream.pipe(response, res, false, signal);
-		task.complete(color, statusCode);
+		complete(statusCode, color);
 	} catch (e) {
-		task.error(e);
+		complete(String(e), "redBright");
 	} finally {
 		closedHere = true;
 		res.end();
@@ -219,8 +233,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 function onSocketOpened(socket: ws.WebSocket, req: http.IncomingMessage) {
 	delete req.headers["sec-websocket-key"];
 	fixHeaders(req.headers);
-	const task = startTask(`ws: ${req.url}`);
-	task.update("proxying socket");
+	const task = startTask();
 	const url = new URL(req.url!, targetUrl);
 	url.protocol = url.protocol.replace("http", "ws");
 	const queue: { data?: ws.RawData, binary: boolean }[] = [];
@@ -228,9 +241,21 @@ function onSocketOpened(socket: ws.WebSocket, req: http.IncomingMessage) {
 		headers: req.headers
 	});
 
+	task.addField({ value: `WS ${req.url}`, color: "blueBright" });
+	let status = task.addField({ value: "processing request" });
+
+	function complete(value: util.StringLike, color?: ConsoleColor) {
+		update(value, color);
+		task.complete();
+	}
+
+	function update(value: util.StringLike, color?: ConsoleColor) {
+		status = status.replace({ value, color });
+	}
+
 	function onAbort() {
 		target.close();
-		task.complete("blackBright", "socket closed");
+		complete("socket closed by client", "blackBright");
 	}
 
 	signal.addEventListener("abort", onAbort);
@@ -249,7 +274,7 @@ function onSocketOpened(socket: ws.WebSocket, req: http.IncomingMessage) {
 	});
 
 	target.on("error", e => {
-		task.error(e);
+		complete(String(e), "redBright");
 		socket.close(1011, String(e));
 	});
 
@@ -258,7 +283,7 @@ function onSocketOpened(socket: ws.WebSocket, req: http.IncomingMessage) {
 	});
 
 	target.on("open", () => {
-		task.update("green", "socket open");
+		update("socket open", "green");
 		let message;
 		while ((message = queue.shift())) {
 			const { data } = message;
@@ -268,7 +293,7 @@ function onSocketOpened(socket: ws.WebSocket, req: http.IncomingMessage) {
 	});
 
 	target.on("close", (code, reason) => {
-		task.abort();
+		complete("socket closed by server", "blackBright");
 		if (code === 1005) {
 			socket.close();
 		} else {

@@ -1,3 +1,4 @@
+import * as util from "node:util";
 import ConsoleString, { ConsoleColor, ConsoleWriter } from "./console-string.js";
 import type { StringLike } from "./util.js";
 
@@ -5,15 +6,42 @@ export interface TaskFactory {
 	start(text: string): Task;
 }
 
+export type DefaultFields = "progress" | "initiated";
+
+export interface TaskFieldInitBase {
+	format?: string;
+	color?: ConsoleColor;
+}
+
+export interface TaskDefaultFieldInit extends TaskFieldInitBase {
+	field: DefaultFields;
+}
+
+export interface TaskValueFieldInit extends TaskFieldInitBase {
+	value: StringLike;
+}
+
+export type TaskFieldInit = TaskDefaultFieldInit | TaskValueFieldInit;
+
+type TaskGetter = (task: TaskImpl) => null | undefined | string
+
+interface TaskField {
+	write(out: ConsoleWriter, task: TaskImpl): void;
+}
+
+type TaskFieldFactory = (init: TaskFieldInitBase) => TaskField;
+
+interface TaskFieldRef {
+	replace(init: TaskFieldInit): TaskFieldRef;
+}
+
 export interface TaskBase {
 	readonly initiated: number;
 	readonly duration: null | number;
 	readonly isCompleted: boolean;
 
-	abort(): void;
-	update(...args: ColorableArgs): void;
-	complete(...args: ColorableArgs): void;
-	error(e: any): void;
+	complete(): void;
+	addField(init: TaskFieldInit): TaskFieldRef;
 
 	write(writer: ConsoleWriter): void;
 }
@@ -32,7 +60,7 @@ export type Task = TaskIncomplete | TaskComplete;
 
 export interface TaskConstructor {
 	readonly prototype: Task;
-	new(anim: string[], prefix: string, color?: ConsoleColor): Task;
+	new(anim: string[]): Task;
 }
 
 type ColoredArgs = readonly [color: ConsoleColor, text: StringLike];
@@ -42,12 +70,90 @@ function unwrapArgs(fallback: ConsoleColor, args: ColorableArgs): ColoredArgs {
 	return args.length === 2 ? args : [fallback, args[0]];
 }
 
+function expand(value: StringLike | null | undefined, { color, format }: TaskFieldInitBase) {
+	const text = format ? util.format(format, value) : String(value);
+	return color ? new ConsoleString(text, color) : text;
+}
+
+function write(writer: ConsoleWriter, value: string | ConsoleString) {
+	typeof value === "string" ? writer.write(value) : value.writeTo(writer);
+}
+
+class ProgressTaskField implements TaskField {
+	readonly #anim: string[];
+	#index: number;
+
+	constructor(anim: string[]) {
+		this.#anim = anim;
+		this.#index = 0;
+	}
+
+	write(out: ConsoleWriter): void {
+		const anim = this.#anim;
+		const index = (this.#index + 1) % anim.length;
+		this.#index = index;
+		out.write(anim[index]);
+	}
+}
+
+class DefaultTaskField implements TaskField {
+	readonly #init: TaskFieldInitBase;
+	readonly #getter: TaskGetter;
+	
+	constructor(init: TaskFieldInitBase, getter: TaskGetter) {
+		this.#init = init;
+		this.#getter = getter;
+	}
+
+	write(out: ConsoleWriter, task: TaskImpl): void {
+		const value = this.#getter.call(undefined, task);
+		const text = expand(value, this.#init);
+		write(out, text);
+	}
+}
+
+class ValueTaskField implements TaskField {
+	readonly #value: string | ConsoleString;
+
+	constructor(init: TaskFieldInitBase, value: StringLike) {
+		this.#value = expand(value, init);
+	}
+
+	write(out: ConsoleWriter): void {
+		write(out, this.#value);
+	}
+}
+
 class TaskImpl implements TaskBase {
+	static readonly #defaultFields: Record<DefaultFields, TaskFieldFactory> = {
+		progress: i => new DefaultTaskField(i, v => v.#progress()),
+		initiated: i => new DefaultTaskField(i, v => v.#initiatedText)
+	}
+
+	static readonly #FieldRef = class TaskFieldRefImpl implements TaskFieldRef {
+		#owner: null | TaskImpl;
+		#index: number;
+
+		constructor(owner: TaskImpl, index: number) {
+			this.#owner = owner;
+			this.#index = index;
+		}
+
+		replace(init: TaskFieldInit): TaskFieldRef {
+			if (this.#owner == null)
+				throw new TypeError("Reference has already been replaced.");
+
+			const ref = this.#owner.#addField(init, this.#index);
+			this.#owner = null;
+			return ref;
+		}
+	}
+
 	readonly #loading: string[];
 	#loadingIndex: number;
 	readonly #initiated: number;
 	readonly #initiatedText: string;
-	readonly #text: ConsoleString[];
+	readonly #fields: TaskField[];
 	#completed: null | number;
 
 	get initiated() {
@@ -66,76 +172,64 @@ class TaskImpl implements TaskBase {
 		return this.#completed != null;
 	}
 
-	constructor(loading: string[], prefix: string, color?: ConsoleColor) {
+	constructor(loading: string[]) {
 		const now = Date.now();
-		const first =  new ConsoleString(prefix, color);
 		this.#loading = loading;
 		this.#loadingIndex = 0;
-		this.#text = [first];
+		this.#fields = [];
 		this.#initiated = now;
 		this.#initiatedText = new Date(now).toISOString().substring(11, 23);
 		this.#completed = null;
 	}
 
-	#setText(color: ConsoleColor, text: StringLike) {
-		this.#text[1] = new ConsoleString(text, color);
+	#addField(init: TaskFieldInit, index: number) {
+		let field: TaskField;
+		if ("field" in init) {
+			field = TaskImpl.#defaultFields[init.field](init);
+		} else {
+			field = new ValueTaskField(init, init.value);
+ 		}
+
+		this.#fields[index] = field;
+		return new TaskImpl.#FieldRef(this, index);
 	}
 
-	abort() {
-		if (this.#completed == null) {
-			this.#setText("redBright", "Request aborted");
-			this.#completed = Date.now();
+	addField(init: TaskFieldInit): TaskFieldRef {
+		return this.#addField(init, this.#fields.length);
+	}
+
+	#progress() {
+		const dur = this.duration;
+		if (dur == null) {
+			return this.#tickLoader();
+		} else {
+			const txt = (dur / 1000).toFixed(3).padStart(6, " ");
+			return txt + "s";
 		}
 	}
 
-	update(...args: ColorableArgs): void {
-		if (this.#completed != null)
-			return;
-			
-		const [color, text] = unwrapArgs("green", args);
-		this.#setText(color, text);
+	#tickLoader() {
+		const anim = this.#loading;
+		const index = this.#loadingIndex;
+		this.#loadingIndex = (index + 1) % anim.length;
+		return anim[index];
 	}
 
 	complete(...args: ColorableArgs) {
-		if (this.#completed != null)
-			return;
-
-		const [color, text] = unwrapArgs("green", args);
-		this.#setText(color, text);
-		this.#completed = Date.now();
-	}
-
-	error(e: any) {
-		if (this.#completed != null)
-			return;
-
-		this.#setText("red", e);
-		this.#completed = Date.now();
+		if (this.#completed == null)
+			this.#completed = Date.now();
 	}
 
 	write(writer: ConsoleWriter): void {
-		writer.write("[");
-		writer.write(this.initiatedText);
-		writer.write("] [");
+		const fields = this.#fields;
+		if (fields.length === 0)
+			return;
 
-		const text = this.#text;
-		const dur = this.duration;
-		if (dur == null) {
-			const anim = this.#loading;
-			const index = this.#loadingIndex;
-			this.#loadingIndex = (index + 1) % anim.length;
-			writer.write(anim[index]);
-		} else {
-			const txt = (dur / 1000).toFixed(3).padStart(6, " ");
-			writer.write(txt);
-			writer.write("s");
-		}
+		fields[0].write(writer, this);
 
-		writer.write("]");
-
-		for (let i = 0; i < text.length; i++) {
+		for (let i = 1; i < fields.length; i++) {
 			writer.write(" ");
-			text[i].writeTo(writer);
+			fields[i].write(writer, this);
 		}
 	}
 }
