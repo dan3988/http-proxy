@@ -203,7 +203,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 		task.addField({ value: addr, color: "magentaBright" });
 	}
 
-	task.addField({ value: `${method} ${url}`, color: "blueBright" });
+	task.addField({ value: `${method} "${url}"`, color: "blueBright" });
 	let status = task.addField({ value: "processing request" });
 
 	function complete(value: util.StringLike, color?: ConsoleColor) {
@@ -255,7 +255,7 @@ function onSocketOpened(socket: ws.WebSocket, req: http.IncomingMessage) {
 		task.addField({ value: addr, color: "magentaBright" });
 	}
 
-	task.addField({ value: `WS ${req.url}`, color: "blueBright" });
+	task.addField({ value: `WS "${req.url}"`, color: "blueBright" });
 	let status = task.addField({ value: "processing request" });
 
 	function complete(value: util.StringLike, color?: ConsoleColor) {
