@@ -68,10 +68,10 @@ function templateString(template: TemplateStringsArray, args: ConsoleStringInit[
 	const builder: StringLike[] = [first];
 
 	for (let i = 0; i < args.length; ) {
-		const { value: text, bg, fg } = args[i];
+		const { value, bg, fg } = args[i];
 		const string = template[++i]
 		const [open, close] = getOpenClose(fg, bg);
-		builder.push(open, text, close, string);
+		builder.push(open, value, close, string);
 	}
 
 	return builder.join("");

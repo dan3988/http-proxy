@@ -29,14 +29,7 @@ const parser = yargs(argv)
 const { port, target } = parser.parseSync();
 const server = http.createServer();
 const wss = new ws.WebSocketServer({ server });
-const targetUrl = (() => {
-	if (isNaN(+target)) {
-		return new URL(target);
-	} else {
-		return new URL("http://localhost:" + target);
-	}
-})();
-
+const targetUrl = isNaN(+target) ? new URL(target) : new URL("http://localhost:" + target);
 if ((targetUrl.hostname === "127.0.0.1" || targetUrl.hostname === "localhost") && targetUrl.port == String(port)) {
 	console.log("%s", ConsoleString("Target url is the same as this server", "red"))
 	process.exit(-1);
