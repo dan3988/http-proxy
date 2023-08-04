@@ -93,7 +93,7 @@ class ConsoleLineWriter implements ConsoleWriter {
 			return;
 
 		const out = this.#out;
-		const remaining = out.columns - this.#len - 3;
+		const remaining = out.columns - this.#len - 4;
 		if (remaining >= value.length) {
 			out.write(value);
 			this.#len += value.length;
@@ -107,7 +107,7 @@ class ConsoleLineWriter implements ConsoleWriter {
 	}
 
 	next() {
-		this.#out.write("\n")
+		this.#out.write("\n");
 		this.#done = false;
 		this.#len = 0;
 	}
@@ -118,7 +118,6 @@ async function render() {
 	out.cursorTo(0, 0);
 	out.clearScreenDown();
 	out.write(ConsoleString`listening on ${{ value: port, fg: "yellow" }}\n`);
-
 	let loadingIndex = 0;
 	let timeout = -1;
 	let messageCount = 0;
