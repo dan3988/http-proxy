@@ -1,5 +1,7 @@
-import * as http from "node:http";
-import * as https  from "node:https";
+import http from "node:http";
+import https  from "node:https";
+import path from "node:path";
+import fs from "node:fs";
 import * as util from "./util.js";
 import * as ws from "ws";
 import Task, { TaskComplete } from "./task.js";
@@ -11,7 +13,8 @@ import type { WriteStream } from "node:tty";
 
 const argv = hideBin(process.argv);
 const parser = yargs(argv)
-	.wrap(100)
+	.wrap(105)
+	.usage("Usage:\n  http-proxy [options]")
 	.alias("?", "help")
 	.option("target", {
 		desc: "The URL target of the proxy, or a number for a localhost port.",
@@ -29,15 +32,59 @@ const parser = yargs(argv)
 		desc: "Show the IP address of requests in the console.",
 		type: "boolean"
 	})
+	.option("secure", {
+		desc: "Run the server in HTTPS mode. Can optionally specify the folder for --key and --cert.",
+		alias: "S",
+		type: "string"
+	})
+	.option("key", {
+		desc: "The path to the private key for the HTTPS server",
+		alias: "K",
+		type: "string",
+		implies: [ "secure" ]
+	})
+	.option("cert", {
+		desc: "The path to the public key for the HTTPS server",
+		alias: "C",
+		type: "string",
+		implies: [ "secure" ]
+	})
 
-const { port, target, ip } = parser.parseSync();
-const server = http.createServer();
-const wss = new ws.WebSocketServer({ server });
-const targetUrl = isNaN(+target) ? new URL(target) : new URL("http://localhost:" + target);
-if ((targetUrl.hostname === "127.0.0.1" || targetUrl.hostname === "localhost") && targetUrl.port == String(port)) {
-	console.log("%s", ConsoleString("Target url is the same as this server", "red"))
+function exit(msg: string): never {
+	console.log(ConsoleString(msg, "red"))
 	process.exit(-1);
 }
+
+function tryReadFile(key: keyof ArgsOfType<string | undefined | null>, defaultValue: string, baseDir: string) {
+	const value = args[key];
+	const file = path.resolve(baseDir, value ?? defaultValue);
+	if (!fs.existsSync(file))
+		exit(`--${key}: file not found: "${file}".`);
+
+	return fs.readFileSync(file);
+}
+
+type ArgsType = typeof parser extends import("yargs").Argv<infer A> ? A : never;
+type ArgsOfType<T> = { [P in keyof ArgsType as ArgsType[P] extends T ? P : never]: ArgsType[P] };
+
+const args = parser.parseSync();
+const { port, target, ip, secure } = args;
+const server = (() => {
+	if (secure == null) {
+		return http.createServer();
+	} else {
+		const baseDir = secure || ".";
+		return https.createServer({ 
+			key: tryReadFile("key", "key.pem", baseDir),
+			cert: tryReadFile("cert", "cert.pem", baseDir)
+		});
+	}
+})();
+
+const wss = new ws.WebSocketServer({ server });
+const targetUrl = isNaN(+target) ? new URL(target) : new URL("http://localhost:" + target);
+if ((targetUrl.hostname === "127.0.0.1" || targetUrl.hostname === "localhost") && targetUrl.port == String(port))
+	exit("Target url is the same as this server");
 
 const driver = targetUrl.protocol === "http:" ? http : https;
 const statusColors: Record<string, ConsoleColor> = {
