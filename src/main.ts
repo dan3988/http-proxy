@@ -13,7 +13,7 @@ import type { WriteStream } from "node:tty";
 
 const argv = hideBin(process.argv);
 const parser = yargs(argv)
-	.wrap(105)
+	.wrap(100)
 	.usage("Usage:\n  http-proxy [options]")
 	.alias("?", "help")
 	.option("target", {
@@ -23,17 +23,17 @@ const parser = yargs(argv)
 		demandOption: true
 	})
 	.option("port", {
-		desc: "The port to start a server on.",
+		desc: "The port for the server to listen to.",
 		alias: "p",
 		type: "number",
-		default: 8080
+		defaultDescription: "8080"
 	})
 	.option("ip", {
 		desc: "Show the IP address of requests in the console.",
 		type: "boolean"
 	})
 	.option("secure", {
-		desc: "Run the server in HTTPS mode. Can optionally specify the folder for --key and --cert.",
+		desc: "Run the server in HTTPS mode. Can optionally be used to specify the base directory for --key and --cert.",
 		alias: "S",
 		type: "string"
 	})
@@ -41,12 +41,14 @@ const parser = yargs(argv)
 		desc: "The path to the private key for the HTTPS server",
 		alias: "K",
 		type: "string",
+		defaultDescription: '"key.pem"',
 		implies: [ "secure" ]
 	})
 	.option("cert", {
 		desc: "The path to the public key for the HTTPS server",
 		alias: "C",
 		type: "string",
+		defaultDescription: '"cert.pem"',
 		implies: [ "secure" ]
 	})
 
@@ -68,7 +70,7 @@ type ArgsType = typeof parser extends import("yargs").Argv<infer A> ? A : never;
 type ArgsOfType<T> = { [P in keyof ArgsType as ArgsType[P] extends T ? P : never]: ArgsType[P] };
 
 const args = parser.parseSync();
-const { port, target, ip, secure } = args;
+const { port = 8080, target, ip, secure } = args;
 const server = (() => {
 	if (secure == null) {
 		return http.createServer();
