@@ -24,6 +24,8 @@ export namespace stream {
 					input.destroy();
 				});
 
+			output.on("error", reject);
+
 			input.on("data", c => output.write(c));
 			input.on("error", reject);
 			input.on("end", end ? () => output.end(resolve) : resolve);
