@@ -256,6 +256,7 @@ function onSocketOpened(socket: ws.WebSocket, req: http.IncomingMessage) {
 
 	task.addField({ value: `WS "${req.url}"`, color: "blueBright" });
 	let status = task.addField({ value: "processing request" });
+	let serverClosed = false;
 
 	function complete(value: util.StringLike, color?: ConsoleColor) {
 		update(value, color);
@@ -274,8 +275,8 @@ function onSocketOpened(socket: ws.WebSocket, req: http.IncomingMessage) {
 	signal.addEventListener("abort", onAbort);
 
 	socket.on("close", () => {
-		onAbort();
 		signal.removeEventListener("abort", onAbort);
+		serverClosed || onAbort();
 	});
 
 	socket.on("message", (data, binary) => {
@@ -306,10 +307,15 @@ function onSocketOpened(socket: ws.WebSocket, req: http.IncomingMessage) {
 	});
 
 	target.on("close", (code, reason) => {
-		complete("socket closed by server", "blackBright");
+		serverClosed = true;
 		if (code === 1005) {
-			socket.close();
+			complete("CLOSE_ABNORMAL", "redBright");
+			socket.close(1011, "CLOSED_NO_STATUS");
+		} else if (code === 1006) {
+			complete("CLOSE_ABNORMAL", "redBright");
+			socket.close(1011, "CLOSE_ABNORMAL");
 		} else {
+			complete("socket closed by server", "blackBright");
 			socket.close(code, reason);
 		}
 	})
