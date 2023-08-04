@@ -35,7 +35,8 @@ const parser = yargs(argv)
 	.option("secure", {
 		desc: "Run the server in HTTPS mode. Can optionally be used to specify the base directory for --key and --cert.",
 		alias: "S",
-		type: "string"
+		type: "string",
+		defaultDescription: "false"
 	})
 	.option("key", {
 		desc: "The path to the private key for the HTTPS server",
