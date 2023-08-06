@@ -2,6 +2,8 @@
 
 A node JS CLI to proxy requests to another URL.
 
+[![npm version](https://badge.fury.io/js/@daniel.pickett%2Fhttp-proxy.svg)](https://badge.fury.io/js/@daniel.pickett%2Fhttp-proxy)
+
 ## Usage
 `http-server [options]`
 
