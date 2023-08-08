@@ -32,6 +32,10 @@ const parser = yargs(argv)
 		desc: "Show the IP address of requests in the console.",
 		type: "boolean"
 	})
+	.option("active-only", {
+		desc: "Don't log completed requests to the console",
+		type: "boolean"
+	})
 	.option("secure", {
 		desc: "Run the server in HTTPS mode. Can optionally be used to specify the base directory for --key and --cert.",
 		alias: "S",
@@ -71,7 +75,7 @@ type ArgsType = typeof parser extends import("yargs").Argv<infer A> ? A : never;
 type ArgsOfType<T> = { [P in keyof ArgsType as ArgsType[P] extends T ? P : never]: ArgsType[P] };
 
 const args = parser.parseSync();
-const { port = 8080, target, ip, secure } = args;
+const { port = 8080, target, ip, secure, ["active-only"]: activeOnly } = args;
 const server = (() => {
 	if (secure == null) {
 		return http.createServer();
@@ -192,9 +196,11 @@ async function render() {
 
 		const writer = new ConsoleLineWriter(out);
 
-		for (const task of completed) {
-			task.write(writer);
-			writer.next();
+		if (!activeOnly) {
+			for (const task of completed) {
+				task.write(writer);
+				writer.next();
+			}
 		}
 
 		if ((messageCount = tasks.length) === 0) {
