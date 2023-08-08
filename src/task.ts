@@ -66,8 +66,25 @@ export interface TaskConstructor {
 type ColoredArgs = readonly [color: ConsoleColor, text: StringLike];
 type ColorableArgs = readonly [text: StringLike] | ColoredArgs;
 
-function unwrapArgs(fallback: ConsoleColor, args: ColorableArgs): ColoredArgs {
-	return args.length === 2 ? args : [fallback, args[0]];
+function divRem(dividend: number, divisor: number): [number, number] {
+	const result = dividend / divisor;
+	const rounded = Math.trunc(result);
+	return [rounded, dividend - (rounded * divisor)];
+}
+
+function durationToString(ms: number) {
+	let seconds = ms / 1000;
+	if (seconds < 60)
+		return seconds.toFixed(3) + "s";
+	
+	let mins: number;
+	[mins, seconds] = divRem(seconds, 60);
+	if (mins < 60)
+		return `${mins}m ${seconds}s`;
+
+	let hours: number;
+	[hours, mins] = divRem(mins, 60);
+	return `${hours}h ${mins}m`;
 }
 
 function expand(value: StringLike | null | undefined, { color, format }: TaskFieldInitBase) {
@@ -203,8 +220,7 @@ class TaskImpl implements TaskBase {
 		if (dur == null) {
 			return this.#tickLoader();
 		} else {
-			const txt = (dur / 1000).toFixed(3).padStart(6, " ");
-			return txt + "s";
+			return durationToString(dur).padStart(7, " ");
 		}
 	}
 
