@@ -168,6 +168,7 @@ async function render() {
 	out.cursorTo(0, 0);
 	out.clearScreenDown();
 	out.write(ConsoleString`listening on ${{ value: port, fg: "yellow" }}\n`);
+	out.write("\nNo active requests.\n");
 	let loadingIndex = 0;
 	let timeout = -1;
 	let messageCount = 0;
@@ -177,7 +178,7 @@ async function render() {
 		if (signalled)
 			renderController = new AbortController();
 	
-		out.moveCursor(0, -messageCount);
+		out.moveCursor(0, -messageCount - 2);
 		out.clearScreenDown();
 		
 		const completed: TaskComplete[] = [];
@@ -201,8 +202,13 @@ async function render() {
 		if ((messageCount = tasks.length) === 0) {
 			loadingIndex = 0;
 			timeout = -1;
+			out.write("\nNo active requests.\n");
 			continue;
 		}
+		
+		out.write("\n");
+		out.write(messageCount === 1 ? "1 active request." : `${messageCount} active requests.`);
+		out.write("\n");
 
 		for (const task of tasks) {
 			task.write(writer);
