@@ -165,8 +165,6 @@ class ConsoleLineWriter implements ConsoleWriter {
 
 async function render() {
 	const out = process.stdout;
-	out.cursorTo(0, 0);
-	out.clearScreenDown();
 	out.write(ConsoleString`listening on ${{ value: port, fg: "yellow" }}\n`);
 	out.write("\nNo active requests.\n");
 	let loadingIndex = 0;
